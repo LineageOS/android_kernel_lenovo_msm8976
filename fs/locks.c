@@ -542,7 +542,7 @@ static void locks_insert_block(struct file_lock *blocker,
 	BUG_ON(!list_empty(&waiter->fl_block));
 	waiter->fl_next = blocker;
 	list_add_tail(&waiter->fl_block, &blocker->fl_block);
-	if (IS_POSIX(blocker))
+	if (IS_POSIX(blocker) && !IS_OFDLCK(blocker))
 		locks_insert_global_blocked(waiter);
 }
 
@@ -695,6 +695,15 @@ EXPORT_SYMBOL(posix_test_lock);
  * of tasks (such as posix threads) sharing the same open file table.
  *
  * To handle those cases, we just bail out after a few iterations.
+ *
+ * For FL_FILE_PVT locks, the owner is the filp, not the files_struct.
+ * Because the owner is not even nominally tied to a thread of
+ * execution, the deadlock detection below can't reasonably work well. Just
+ * skip it for those.
+ *
+ * In principle, we could do a more limited deadlock detection on FL_FILE_PVT
+ * locks that just checks for the case where two tasks are attempting to
+ * upgrade from read to write locks on the same inode.
  */
 
 #define MAX_DEADLK_ITERATIONS 10
@@ -711,10 +720,18 @@ static struct file_lock *what_owner_is_waiting_for(struct file_lock *block_fl)
 	return NULL;
 }
 
+
 static int posix_locks_deadlock(struct file_lock *caller_fl,
 				struct file_lock *block_fl)
 {
 	int i = 0;
+
+	/*
+	 * This deadlock detector can't reasonably detect deadlocks with
+	 * FL_FILE_PVT locks, since they aren't owned by a process, per-se.
+	 */
+	if (IS_OFDLCK(caller_fl))
+		return 0;
 
 	while ((block_fl = what_owner_is_waiting_for(block_fl))) {
 		if (i++ > MAX_DEADLK_ITERATIONS)
