@@ -102,6 +102,12 @@ static inline void mark_rodata_ro(void) { }
 extern void tc_init(void);
 #endif
 
+#ifdef CONFIG_MACH_LENOVO_YTX703
+int g_com_board_ver = 0;
+int g_com_board_id = 0;
+int g_com_lcd_id = 0;
+#endif
+
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -209,6 +215,63 @@ static int __init quiet_kernel(char *str)
 	console_loglevel = 4;
 	return 0;
 }
+
+#ifdef CONFIG_MACH_LENOVO_YTX703
+static int __init setup_com_board_ver(char *str)
+{
+	int id;
+	if (get_option(&str, &id)) {
+		pr_notice("Lenovo YTX703: Board version %d\n", id);
+		g_com_board_ver = id;
+		return 0;
+	}
+	return -EINVAL;
+}
+
+int get_com_board_ver(void)
+{
+	return g_com_board_ver;
+}
+EXPORT_SYMBOL(get_com_board_ver);
+
+static int __init setup_com_board_id(char *str)
+{
+	int id;
+	if (get_option(&str, &id)) {
+		pr_notice("Lenovo YTX703: Board ID %d\n", id);
+		g_com_board_id = id;
+		return 0;
+	}
+	return -EINVAL;
+}
+
+int get_com_board_id(void)
+{
+	return g_com_board_id;
+}
+EXPORT_SYMBOL(get_com_board_id);
+
+static int __init setup_com_lcd_id(char *str)
+{
+	int id;
+	if (get_option(&str, &id)) {
+		g_com_lcd_id = id;
+		pr_notice("Lenovo YTX703: LCD ID %d\n", id);
+		return 0;
+	}
+	return -EINVAL;
+}
+
+int get_com_lcd_id(void)
+{
+	return g_com_lcd_id;
+}
+EXPORT_SYMBOL(get_com_lcd_id);
+
+early_param("com_board_ver", setup_com_board_ver);
+early_param("com_board_id",  setup_com_board_id);
+early_param("com_lcd_id",    setup_com_lcd_id);
+#endif
 
 early_param("debug", debug_kernel);
 early_param("quiet", quiet_kernel);

@@ -1627,6 +1627,13 @@ out:
 	return -EINVAL;
 }
 
+#ifdef CONFIG_MACH_LENOVO_YTX703
+/*
+ * Defined in init/main.c
+ */
+extern int get_com_board_ver(void);
+#endif
+
 /* Parse platform data */
 static
 struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
@@ -1652,6 +1659,12 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	}
 
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
+
+#ifdef CONFIG_MACH_LENOVO_YTX703
+	if (get_com_board_ver() < 3)
+		flags |= OF_GPIO_ACTIVE_LOW;
+#endif
+
 	if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
 
