@@ -276,6 +276,8 @@ static int ovl_create_object(struct dentry *dentry, int mode, dev_t rdev,
 		.mode = mode,
 		.rdev = rdev,
 	};
+	const struct cred *old_cred;
+	struct cred *override_cred;
 
 	err = -ENOMEM;
 	inode = ovl_new_inode(dentry->d_sb, mode, dentry->d_fsdata);
@@ -288,6 +290,16 @@ static int ovl_create_object(struct dentry *dentry, int mode, dev_t rdev,
 
 	upperdir = ovl_dentry_upper(dentry->d_parent);
 	mutex_lock_nested(&upperdir->d_inode->i_mutex, I_MUTEX_PARENT);
+
+	override_cred = prepare_creds();
+	old_cred = override_creds(override_cred);
+	err = security_dentry_create_files_as(dentry,
+			stat.mode, &dentry->d_name, old_cred,
+			override_cred);
+	/*if (err) {*/
+		/*put_cred(override_cred);*/
+		/*goto out_unlock;*/
+	/*}*/
 
 	newdentry = ovl_upper_create(upperdir, dentry, &stat, link);
 	err = PTR_ERR(newdentry);
