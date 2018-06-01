@@ -184,6 +184,8 @@ static int ovl_copy_up_locked(struct dentry *upperdir, struct dentry *dentry,
 	int err;
 	struct path newpath;
 	umode_t mode = stat->mode;
+	const struct cred *old_creds = NULL;
+	struct cred *new_creds = NULL;
 
 	/* Can't properly set mode on creation because of the umask */
 	stat->mode &= S_IFMT;
@@ -193,6 +195,13 @@ static int ovl_copy_up_locked(struct dentry *upperdir, struct dentry *dentry,
 	newpath.dentry = ovl_upper_create(upperdir, dentry, stat, link);
 	if (IS_ERR(newpath.dentry))
 		return PTR_ERR(newpath.dentry);
+
+	err = security_inode_copy_up(dentry, &new_creds);
+	if (err < 0)
+		goto err_remove;
+
+	if (new_creds)
+		old_creds = override_creds(new_creds);
 
 	if (S_ISREG(stat->mode)) {
 		err = ovl_copy_up_data(lowerpath, &newpath, stat->size);
@@ -209,6 +218,12 @@ static int ovl_copy_up_locked(struct dentry *upperdir, struct dentry *dentry,
 		err = ovl_set_mode(newpath.dentry, mode);
 	if (!err)
 		err = ovl_set_timestamps(newpath.dentry, stat);
+
+	if (new_creds) {
+		revert_creds(old_creds);
+		put_cred(new_creds);
+	}
+
 	mutex_unlock(&newpath.dentry->d_inode->i_mutex);
 	if (err)
 		goto err_remove;
