@@ -391,6 +391,15 @@ out:
 }
 EXPORT_SYMBOL(security_inode_init_security);
 
+int security_dentry_create_files_as(struct dentry *dentry, int mode,
+					struct qstr *name,
+					const struct cred *old, struct cred *new)
+{
+	return security_ops->dentry_create_files_as(dentry, mode,
+				name, old, new);
+}
+EXPORT_SYMBOL(security_dentry_create_files_as);
+
 int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 				     const struct qstr *qstr, char **name,
 				     void **value, size_t *len)
