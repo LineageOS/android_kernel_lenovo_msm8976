@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/bio.h>
+#include <linux/string.h>
 
 struct linux_binprm;
 struct cred;
@@ -307,6 +308,14 @@ static inline void security_free_mnt_opts(struct security_mnt_opts *opts)
  *	Parse a string of security data filling in the opts structure
  *	@options string containing all mount options known by the LSM
  *	@opts binary data structure usable by the LSM
+ * @dentry_init_security:
+ *	Compute a context for a dentry as the inode is not yet available
+ *	since NFSv4 has no label backed by an EA anyway.
+ *	@dentry dentry to use in calculating the context.
+ *	@mode mode used to determine resource type.
+ *	@name name of the last path component used to create file
+ *	@ctx pointer to place the pointer to the resulting context in.
+ *	@ctxlen point to place the length of the resulting context.
  *
  * Security hooks for inode operations.
  *
@@ -1467,6 +1476,9 @@ struct security_operations {
 	int (*sb_clone_mnt_opts) (const struct super_block *oldsb,
 				   struct super_block *newsb);
 	int (*sb_parse_opts_str) (char *options, struct security_mnt_opts *opts);
+	int (*dentry_init_security) (struct dentry *dentry, int mode,
+					struct qstr *name, void **ctx,
+					u32 *ctxlen);
 
 #ifdef CONFIG_SECURITY_PATH
 	int (*path_unlink) (struct path *dir, struct dentry *dentry);
@@ -1763,6 +1775,9 @@ int security_sb_set_mnt_opts(struct super_block *sb, struct security_mnt_opts *o
 int security_sb_clone_mnt_opts(const struct super_block *oldsb,
 				struct super_block *newsb);
 int security_sb_parse_opts_str(char *options, struct security_mnt_opts *opts);
+int security_dentry_init_security(struct dentry *dentry, int mode,
+					struct qstr *name, void **ctx,
+					u32 *ctxlen);
 
 int security_inode_alloc(struct inode *inode);
 void security_inode_free(struct inode *inode);
@@ -2086,6 +2101,15 @@ static inline int security_sb_clone_mnt_opts(const struct super_block *oldsb,
 static inline int security_sb_parse_opts_str(char *options, struct security_mnt_opts *opts)
 {
 	return 0;
+}
+
+static inline int security_dentry_init_security(struct dentry *dentry,
+						 int mode,
+						 struct qstr *name,
+						 void **ctx,
+						 u32 *ctxlen)
+{
+	return -EOPNOTSUPP;
 }
 
 static inline int security_inode_alloc(struct inode *inode)
