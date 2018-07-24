@@ -136,6 +136,10 @@
 	qcom,mdss-dsi-v-back-porch = <24>;  /* Vertical back porch in pixels; previously 7 */
 	qcom,mdss-dsi-v-front-porch = <16>; /* Vertical front porch in pixels; previously 8 */
 	qcom,mdss-dsi-v-pulse-width = <8>;  /* Previously 1 */
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs"; // control backlight via dsi commands
+	/* Backlight controller operates in range 0<x<256 */
+	qcom,mdss-dsi-bl-min-level = <0x01>;
+	qcom,mdss-dsi-bl-max-level = <0xFF>;
 	qcom,mdss-dsi-on-command =
 	       [39 01 00 00 01 00 06 f0 55 aa 52 08 00
 	        15 01 00 00 01 00 02 c0 0d
@@ -145,11 +149,12 @@
 	        15 01 00 00 01 00 02 f7 01
 	        39 01 00 00 01 00 05 ff aa 55 a5 00
 	        15 01 00 00 01 00 02 62 01
-	        15 01 00 00 01 00 02 55 00 /* CABC (0: off, 1: UI, 2: Picture, 3: Video) */
-	        15 01 00 00 01 00 02 53 24
-	        15 01 00 00 01 00 02 51 80
+	        15 01 00 00 01 00 02 55 02
 	        05 01 00 00 78 00 02 11 00
-	        05 01 00 00 15 00 02 29 00];
+	        05 01 00 00 15 00 02 29 00
+	        15 01 00 00 01 00 02 51 00 // initial brightness set to 0
+	        15 01 00 00 01 00 02 53 24 // turn the lights on
+	        ];
 	/* DSI PHY timings */
 	qcom,mdss-dsi-panel-timings = [D5 32 22 00 60 64 26 34 29 03 04 00];
 };
@@ -202,8 +207,9 @@
 		compatible = "ti,lp8557";
 		reg = <0x2c>;
 		bl-name = "lcd-bl";
-		dev-ctrl = /bits/ 8 <0x41>;
-		init-brt = /bits/ 8 <0x80>;
+		dev-ctrl = /bits/ 8 <0x00>; /* see lp8557 documentation, PWM mode only */
+		init-brt = /bits/ 8 <0x00>; /* 0% initial brightness */
+		pwm-period = <1000000>; /* value from documentation, doesn't seem to have an effect */
 		/* 4V OV, 4 output LED string enabled */
 		rom_14h {
 			rom-addr = /bits/ 8 <0x14>;
