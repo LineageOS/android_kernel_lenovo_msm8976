@@ -32,6 +32,25 @@
 			linux,code = <114>; /* KEY_VOLUMEDOWN */
 		};
 	};
+	/*
+	 * Documentation/devicetree/bindings/arm/msm/lpm-levels.txt
+	 * Overrides msm8976-pm.dtsi
+	 */
+	qcom,lpm-levels {
+		qcom,pm-cluster@0 {
+			qcom,pm-cluster@1{
+				qcom,pm-cpu {
+					qcom,pm-cpu-level@0 {
+						qcom,time-overhead = <81>;  /* Was 61 */
+					};
+					qcom,pm-cpu-level@1 {
+						qcom,ss-power      = <540>; /* Was 545 */
+						qcom,time-overhead = <241>; /* Was 239 */
+					};
+				};
+			};
+		};
+	};
 };
 
 /*
