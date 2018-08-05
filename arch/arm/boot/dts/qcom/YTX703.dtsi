@@ -77,6 +77,22 @@
 			bias-pull-up;
 		};
 	};
+	cam_sensor_rear_default {
+		qcom,pins = <&gp 35>; /* STANDBY - RESET pin is removed */
+		qcom,num-grp-pins = <1>;
+	};
+	cam_sensor_rear_sleep {
+		qcom,pins = <&gp 35>; /* STANDBY - RESET pin is removed */
+		qcom,num-grp-pins = <1>;
+	};
+	cam_sensor_front_default {
+		qcom,pins = <&gp 131>; /* RESET - STANDBY pin is removed */
+		qcom,num-grp-pins = <1>;
+	};
+	cam_sensor_front_sleep {
+		qcom,pins = <&gp 131>; /* RESET - STANDBY pin is removed */
+		qcom,num-grp-pins = <1>;
+	};
 };
 
 /* LCD panel
