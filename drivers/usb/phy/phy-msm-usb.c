@@ -6557,6 +6557,10 @@ static void msm_otg_shutdown(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "OTG shutdown\n");
 	msm_hsusb_vbus_power(motg, 0);
+#ifdef CONFIG_MACH_LENOVO_YTX703
+	/* add by zouhao for vbus 1->0 time is long */
+	msleep(50);
+#endif
 }
 
 #ifdef CONFIG_PM_RUNTIME
