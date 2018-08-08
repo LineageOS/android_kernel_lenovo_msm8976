@@ -323,6 +323,20 @@
 };
 
 /*
+ * RPM bus
+ * Overrides msm8976-regulator.dtsi
+ * Documentation/devicetree/bindings/regulator/stub-regulator.txt
+ */
+&rpm_bus {
+	stub_camss_top_gdscr: stub_gdscr {
+		compatible = "qcom,stub-regulator";
+		regulator-name = "gdscr";
+		regulator-min-microvolt = <1>;
+		regulator-max-microvolt = <1800000>;
+	};
+};
+
+/*
  * Camera configuration
  * - Forward-ported bindings from LA.BR.1.3.4-06610-8976.0
  * - Documentation/devicetree/bindings/media/video/msm-cci.txt
@@ -423,6 +437,7 @@
 		              "csi_rdi_clk",
 		              "camss_ahb_clk";
 		qcom,clock-rates = <0 61540000 0 200000000 0 0 0 0>;
+		qcom,gdscr-vdd-supply = <&stub_camss_top_gdscr>;
 	};
 
 	/delete-node/ qcom,csid@1b08400;
@@ -452,6 +467,7 @@
 		              "csi_rdi_clk",
 		              "camss_ahb_clk";
 		qcom,clock-rates = <0 61540000 0 200000000 0 0 0 0>;
+		qcom,gdscr-vdd-supply = <&stub_camss_top_gdscr>;
 	};
 
 	/delete-node/ qcom,csid@1b08800;
@@ -481,6 +497,7 @@
 		              "csi_rdi_clk",
 		              "camss_ahb_clk";
 		qcom,clock-rates = <0 61540000 0 200000000 0 0 0 0>;
+		qcom,gdscr-vdd-supply = <&stub_camss_top_gdscr>;
 	};
 
 	/delete-node/ qcom,ispif@1b0a000;
@@ -776,6 +793,7 @@
 		                      "CCI_I2C_CLK0",
 		                      "CCI_I2C_DATA1",
 		                      "CCI_I2C_CLK1";
+		qcom,gdscr-vdd-supply = <&stub_camss_top_gdscr>;
 		i2c_freq_100Khz: qcom,i2c_standard_mode {
 			 qcom,hw-thigh = <78>;
 			 qcom,hw-tlow = <114>;
