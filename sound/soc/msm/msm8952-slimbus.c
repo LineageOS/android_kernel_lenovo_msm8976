@@ -28,6 +28,9 @@
 #include <sound/info.h>
 #include <soc/qcom/socinfo.h>
 #include <linux/input.h>
+#ifdef CONFIG_MACH_LENOVO_YTX703
+#include <linux/thermal.h>
+#endif
 #include "qdsp6v2/msm-pcm-routing-v2.h"
 #include "msm-audio-pinctrl.h"
 #include "msm8952-slimbus.h"
@@ -71,6 +74,11 @@
 #define WSA8810_NAME_1 "wsa881x.20170211"
 #define WSA8810_NAME_2 "wsa881x.20170212"
 
+#ifdef CONFIG_MACH_LENOVO_YTX703
+#define SPK_PA_1_GPIO 910
+#define SPK_PA_2_GPIO 911
+#endif
+
 enum btsco_rates {
 	RATE_8KHZ_ID,
 	RATE_16KHZ_ID,
@@ -94,6 +102,10 @@ static int msm8952_auxpcm_rate = SAMPLING_RATE_8KHZ;
 static int msm_btsco_rate = SAMPLING_RATE_8KHZ;
 static int msm_btsco_ch = 1;
 static int msm8952_spk_control = 1;
+#ifdef CONFIG_MACH_LENOVO_YTX703
+static int msm8952_spk_pa_1_control = 0;
+static int msm8952_spk_pa_2_control = 0;
+#endif
 
 static bool codec_reg_done;
 
@@ -332,6 +344,27 @@ static inline struct snd_mask *param_to_mask(struct snd_pcm_hw_params *p, int n)
 {
 	return &(p->masks[n - SNDRV_PCM_HW_PARAM_FIRST_MASK]);
 }
+
+#ifdef CONFIG_MACH_LENOVO_YTX703
+static int wsa881x_get_temp(struct thermal_zone_device *thermal,
+                            unsigned long *temp)
+{
+	return 0;
+}
+
+static struct thermal_zone_device_ops wsa881x_thermal_ops = {
+	.get_temp = wsa881x_get_temp,
+};
+
+static struct thermal_zone_device *wsa881x_init_thermal_zone(char *name) {
+	struct thermal_zone_device *tz_dev;
+
+	tz_dev = thermal_zone_device_register(name, 0, 0, NULL, &wsa881x_thermal_ops,
+	                                      NULL, 0, 0);
+	pr_err("%s: registered thermal zone %s\n", __func__, tz_dev->type);
+	return tz_dev;
+}
+#endif
 
 int msm895x_wsa881x_init(struct snd_soc_dapm_context *dapm)
 {
@@ -956,6 +989,58 @@ static int msm_proxy_rx_ch_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#ifdef CONFIG_MACH_LENOVO_YTX703
+static int msm8952_get_spk_pa_1_switch(struct snd_kcontrol *kcontrol,
+                                       struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: msm8952_spk_pa_1_control = %d\n",
+	          __func__, msm8952_spk_pa_1_control);
+	ucontrol->value.integer.value[0] = msm8952_spk_pa_1_control;
+	return 0;
+}
+
+static int msm8952_set_spk_pa_1_switch(struct snd_kcontrol *kcontrol,
+                                       struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: ucontrol value = %ld\n", __func__,
+	        ucontrol->value.integer.value[0]);
+	if (msm8952_spk_pa_1_control == ucontrol->value.integer.value[0])
+		return 0;
+
+	gpio_direction_output(SPK_PA_1_GPIO, ucontrol->value.integer.value[0]);
+	msm8952_spk_pa_1_control = ucontrol->value.integer.value[0];
+	pr_debug("%s: msm8952_spk_pa_1_control = %d\n",
+	         __func__, msm8952_spk_pa_1_control);
+	return 1;
+}
+
+static int msm8952_get_spk_pa_2_switch(struct snd_kcontrol *kcontrol,
+                                       struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: msm8952_spk_pa_2_control = %d\n",
+	         __func__, msm8952_spk_pa_2_control);
+	ucontrol->value.integer.value[0] = msm8952_spk_pa_2_control;
+	return 0;
+}
+
+static int msm8952_set_spk_pa_2_switch(struct snd_kcontrol *kcontrol,
+                                       struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: ucontrol value = %ld\n", __func__,
+	         ucontrol->value.integer.value[0]);
+	if (msm8952_spk_pa_2_control == ucontrol->value.integer.value[0])
+		return 0;
+
+	gpio_direction_output(SPK_PA_2_GPIO, ucontrol->value.integer.value[0]);
+	msm8952_spk_pa_2_control = ucontrol->value.integer.value[0];
+	pr_debug("%s: msm8952_spk_pa_2_control = %d\n",
+	         __func__, msm8952_spk_pa_2_control);
+	return 1;
+}
+
+static const char *const spk_pa_1_function[] = {"Off", "On"};
+static const char *const spk_pa_2_function[] = {"Off", "On"};
+#endif
 static const char *const spk_function[] = {"Off", "On"};
 static const char *const slim0_rx_ch_text[] = {"One", "Two"};
 static const char *const slim0_tx_ch_text[] = {"One", "Two", "Three", "Four",
@@ -985,6 +1070,10 @@ static const struct soc_enum msm_snd_enum[] = {
 			    slim5_rx_bit_format_text),
 	SOC_ENUM_SINGLE_EXT(2, slim5_rx_ch_text),
 	SOC_ENUM_SINGLE_EXT(8, proxy_rx_ch_text),
+#ifdef CONFIG_MACH_LENOVO_YTX703
+	SOC_ENUM_SINGLE_EXT(2, spk_pa_1_function),
+	SOC_ENUM_SINGLE_EXT(2, spk_pa_2_function),
+#endif
 };
 
 static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ",
@@ -1024,6 +1113,12 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 		     msm_btsco_rate_get, msm_btsco_rate_put),
 	SOC_ENUM_EXT("PROXY_RX Channels", msm_snd_enum[9],
 			msm_proxy_rx_ch_get, msm_proxy_rx_ch_put),
+#ifdef CONFIG_MACH_LENOVO_YTX703
+	SOC_ENUM_EXT("Spk PA Switch 1", msm_snd_enum[10],
+	             msm8952_get_spk_pa_1_switch, msm8952_set_spk_pa_1_switch),
+	SOC_ENUM_EXT("Spk PA Switch 2", msm_snd_enum[11],
+	             msm8952_get_spk_pa_2_switch, msm8952_set_spk_pa_2_switch),
+#endif
 };
 
 int msm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -2553,6 +2648,20 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 				__func__, ret);
 		goto err;
 	}
+
+#ifdef CONFIG_MACH_LENOVO_YTX703
+	/* Register dummy thermal zones, so that the HAL switches to WSA mode */
+	wsa881x_init_thermal_zone("wsatz.0");
+	wsa881x_init_thermal_zone("wsatz.1");
+
+	/* Request GPIO for both spk pa */
+	gpio_request(SPK_PA_1_GPIO, WSA8810_NAME_1);
+	gpio_request(SPK_PA_2_GPIO, WSA8810_NAME_2);
+
+	/* Disable speakers initially */
+	gpio_direction_output(SPK_PA_1_GPIO, false);
+	gpio_direction_output(SPK_PA_2_GPIO, false);
+#endif
 
 	return 0;
 err:
