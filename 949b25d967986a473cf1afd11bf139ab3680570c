@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f1359de1_7cbbc768",
+        "filename": "arch/arm/boot/dts/qcom/msm8976-pm.dtsi",
+        "patchSetId": 1
+      },
+      "lineNbr": 484,
+      "author": {
+        "id": 18924
+      },
+      "writtenOn": "2018-08-15T18:59:14Z",
+      "side": 1,
+      "message": "Shouldn\u0027t we just add this stuff to YTX703.dtsi instead?",
+      "revId": "949b25d967986a473cf1afd11bf139ab3680570c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
