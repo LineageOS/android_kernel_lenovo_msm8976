@@ -146,6 +146,7 @@ struct bq27541_device_info {
 	struct bq27541_reg_cache 		cache;
 	struct bq27541_reg_no_compare_cache	no_cmp_cache;
 
+	int					max_design_voltage_mv;
 	unsigned long 				last_update;
 	struct delayed_work			work;
 
@@ -590,6 +591,10 @@ static int bq27541_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STATUS:
 		ret = bq27541_battery_status(di, val);
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+		val->intval  = di->max_design_voltage_mv;
+		val->intval *= 1000; /* mV to uV */
+		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		ret = bq27541_simple_value(di->no_cmp_cache.batt_vol, val);
 		val->intval = val->intval * 1000;
@@ -778,10 +783,11 @@ static int bq27541_write_i2c(struct bq27541_device_info *di, u8 reg,
 static int bq27541_battery_probe(struct i2c_client *client,
 				 const struct i2c_device_id *id)
 {
-	char *name;
+	struct device_node *dev_node = client->dev.of_node;
 	struct bq27541_device_info *di;
-	int num;
-	int retval = 0;
+	int    retval = 0;
+	char  *name;
+	int    num;
 
 	/* Get new ID for the new battery device */
 	mutex_lock(&battery_mutex);
@@ -817,6 +823,18 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->bus.read = &bq27541_read_i2c;
 	di->bus.write = &bq27541_write_i2c;
 	i2c_set_clientdata(client, di);
+
+	if (dev_node == NULL) {
+		dev_err(di->dev, "Device Tree node doesn't exist.\n");
+		retval = -ENODEV;
+		goto batt_failed_3;
+	}
+	retval = of_property_read_u32(dev_node, "qcom,max-design-voltage-mv",
+	                              &(di->max_design_voltage_mv));
+	if (retval < 0) {
+		dev_err(di->dev, "Could not find property qcom,max-design-voltage-mv in device tree node!\n");
+		goto batt_failed_3;
+	}
 
 	mutex_init(&di->lock);
 	INIT_DELAYED_WORK(&di->work, bq27541_battery_poll);
