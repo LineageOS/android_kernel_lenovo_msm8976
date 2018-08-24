@@ -1095,18 +1095,14 @@ static int get_prop_batt_voltage_now(struct smbchg_chip *chip)
 	return uv;
 }
 
-#define DEFAULT_BATT_VOLTAGE_MAX_DESIGN	4350000
 static int get_prop_batt_voltage_max_design(struct smbchg_chip *chip)
 {
-	int uv, rc;
+	int uv = -1, rc;
 
-	rc = get_property_from_fg(chip,
-			POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN, &uv);
-	if (rc) {
-		uv = DEFAULT_BATT_VOLTAGE_MAX_DESIGN;
-		dev_info(chip->dev, "Couldn't get POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN, "
-		         "rc = %d, returning default %d\n", rc, uv);
-	}
+	rc = get_property_from_fg(chip, POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN, &uv);
+	if (rc)
+		dev_err(chip->dev, "Couldn't get POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN, rc = %d\n", rc);
+
 	return uv;
 }
 
