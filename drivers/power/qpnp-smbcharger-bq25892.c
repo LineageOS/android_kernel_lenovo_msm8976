@@ -642,30 +642,50 @@ out:
 	return rc;
 }
 
-static void smbchg_stay_awake(struct smbchg_chip *chip, int reason)
+static char *smbchg_wake_reason_to_string(enum wake_reason reason)
+{
+	switch (reason) {
+	case PM_PARALLEL_CHECK:
+		return "PM_PARALLEL_CHECK";
+	case PM_REASON_VFLOAT_ADJUST:
+		return "PM_REASON_VFLOAT_ADJUST";
+	case PM_ESR_PULSE:
+		return "PM_ESR_PULSE";
+	case PM_PARALLEL_TAPER:
+		return "PM_PARALLEL_TAPER";
+	case PM_TIMER_SOC:
+		return "PM_TIMER_SOC";
+	case PM_TIMER_TEMP_CHECK:
+		return "PM_TIMER_TEMP_CHECK";
+	default:
+		return "(unknown)";
+	}
+}
+
+static void smbchg_stay_awake(struct smbchg_chip *chip, enum wake_reason reason)
 {
 	int reasons;
 
 	mutex_lock(&chip->pm_lock);
 	reasons = chip->wake_reasons | reason;
 	if (reasons != 0 && chip->wake_reasons == 0) {
-		dev_info(chip->dev, "staying awake: 0x%02x (bit %d)\n",
-				reasons, reason);
+		dev_dbg(chip->dev, "staying awake: reason %s (mask 0x%02x)\n",
+		        smbchg_wake_reason_to_string(reason), reasons);
 		pm_stay_awake(chip->dev);
 	}
 	chip->wake_reasons = reasons;
 	mutex_unlock(&chip->pm_lock);
 }
 
-static void smbchg_relax(struct smbchg_chip *chip, int reason)
+static void smbchg_relax(struct smbchg_chip *chip, enum wake_reason reason)
 {
 	int reasons;
 
 	mutex_lock(&chip->pm_lock);
 	reasons = chip->wake_reasons & (~reason);
 	if (reasons == 0 && chip->wake_reasons != 0) {
-		dev_info(chip->dev, "relaxing: 0x%02x (bit %d)\n",
-				reasons, reason);
+		dev_dbg(chip->dev, "relaxing: reason %s (mask 0x%02x)\n",
+		        smbchg_wake_reason_to_string(reason), reasons);
 		pm_relax(chip->dev);
 	}
 	chip->wake_reasons = reasons;
