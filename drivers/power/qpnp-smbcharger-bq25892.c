@@ -992,14 +992,6 @@ static int set_property_on_fg(struct smbchg_chip *chip,
 	int rc;
 	union power_supply_propval ret = {0, };
 
-	if (!chip->bms_psy && chip->bms_psy_name)
-		chip->bms_psy =
-			power_supply_get_by_name((char *)chip->bms_psy_name);
-	if (!chip->bms_psy) {
-		dev_err(chip->dev, "no bms psy found\n");
-		return -EINVAL;
-	}
-
 	ret.intval = val;
 	rc = chip->bms_psy->set_property(chip->bms_psy, prop, &ret);
 	if (rc)
@@ -1016,14 +1008,6 @@ static int get_property_from_fg(struct smbchg_chip *chip,
 {
 	int rc;
 	union power_supply_propval ret = {0, };
-
-	if (!chip->bms_psy && chip->bms_psy_name)
-		chip->bms_psy =
-			power_supply_get_by_name((char *)chip->bms_psy_name);
-	if (!chip->bms_psy) {
-		dev_err(chip->dev, "no bms psy found\n");
-		return -EINVAL;
-	}
 
 	rc = chip->bms_psy->get_property(chip->bms_psy, prop, &ret);
 	if (rc) {
@@ -7225,17 +7209,39 @@ static int smbchg_probe(struct spmi_device *spmi)
 	int rc;
 	struct smbchg_chip *chip;
 	struct power_supply *usb_psy;
+	struct power_supply *bms_psy;
 	struct power_supply *parallel_psy;
 	struct qpnp_vadc_chip *vadc_dev, *vchg_vadc_dev;
+	const char *usb_psy_name;
+	const char *bms_psy_name;
+	const char *parallel_psy_name;
 
-	usb_psy = power_supply_get_by_name("usb");
+	rc = of_property_read_string(spmi->dev.of_node, "qcom,usb-psy-name",
+	                             &usb_psy_name);
+	if (rc)
+		usb_psy_name = "usb";
+	rc = of_property_read_string(spmi->dev.of_node, "qcom,bms-psy-name",
+	                             &bms_psy_name);
+	if (rc)
+		bms_psy_name = "bms";
+	rc = of_property_read_string(spmi->dev.of_node, "qcom,parallel-psy-name",
+	                             &parallel_psy_name);
+	if (rc)
+		parallel_psy_name = "usb-parallel";
+
+	usb_psy = power_supply_get_by_name(usb_psy_name);
 	if (!usb_psy) {
 		dev_info(&spmi->dev, "USB supply not found, deferring probe\n");
 		return -EPROBE_DEFER;
 	}
-	parallel_psy = power_supply_get_by_name("usb-parallel");
+	parallel_psy = power_supply_get_by_name(parallel_psy_name);
 	if (!parallel_psy) {
 		dev_info(&spmi->dev, "BQ25892 parallel charger not found, deferring probe\n");
+		return -EPROBE_DEFER;
+	}
+	bms_psy = power_supply_get_by_name(bms_psy_name);
+	if (!bms_psy) {
+		dev_info(&spmi->dev, "BQ27541 battery monitor not found, deferring probe\n");
 		return -EPROBE_DEFER;
 	}
 
@@ -7348,6 +7354,7 @@ static int smbchg_probe(struct spmi_device *spmi)
 	chip->fake_battery_soc = -EINVAL;
 	chip->usb_online = -EINVAL;
 	chip->parallel.psy = parallel_psy;
+	chip->bms_psy = bms_psy;
 	dev_set_drvdata(&spmi->dev, chip);
 
 	spin_lock_init(&chip->sec_access_lock);
