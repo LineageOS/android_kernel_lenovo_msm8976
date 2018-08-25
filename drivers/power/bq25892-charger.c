@@ -585,25 +585,6 @@ static int bq25892_cpc_work(struct bq25892_charger *chip, int up)
 	return ret;
 }
 
-static void bq25892_dump_regs(struct bq25892_charger *chip)
-{
-#define LAST_REG 0x14
-	int rc = 0;
-	u8 reg;
-	u8 addr;
-
-	bq25892_adcc_work(chip, 0 /* force */);
-	for (addr = 0; addr <= LAST_REG; addr++) {
-		rc = bq25892_read_reg(chip, addr, &reg);
-		if (rc)
-			dev_err(chip->dev, "Couldn't read 0x%02x rc = %d\n",
-			        addr, rc);
-		else
-			dev_info(chip->dev, "%s: reg[0x%02x] = 0x%02x\n",
-			         __func__, addr, reg);
-	}
-}
-
 static int bq25892_set_psel(struct bq25892_charger *chip, int supply_type)
 {
 	int rc = 0;
@@ -619,7 +600,6 @@ static int bq25892_set_psel(struct bq25892_charger *chip, int supply_type)
 		        supply_type);
 		gpio_set_value(chip->psel_gpio, 1);
 	}
-	bq25892_dump_regs(chip);
 	return rc;
 }
 
