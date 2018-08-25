@@ -2630,13 +2630,21 @@ static int smbchg_float_voltage_set(struct smbchg_chip *chip, int vfloat_mv)
 		vfloat_mv -= delta % VHIGH_RANGE_FLOAT_STEP_MV;
 	}
 
-	if (parallel_psy) {
-		rc = power_supply_set_voltage_limit(parallel_psy,
-				vfloat_mv + 50);
-		if (rc)
-			dev_err(chip->dev, "Couldn't set float voltage on parallel psy rc: %d\n",
-				rc);
-	}
+	/* Update the bq25892-charger parallel psy */
+	rc = power_supply_set_voltage_limit(parallel_psy,
+	                                    vfloat_mv + 50);
+	if (rc)
+		dev_err(chip->dev, "Couldn't set floating voltage "
+		        "on parallel psy, rc %d\n", rc);
+
+	/* Publish the voltage to userspace for healthd as well.
+	 * The msm_otg driver (phy-msm-usb.c) doesn't do the
+	 * mV to uV transform, so we have to do it here.
+	 */
+	rc = power_supply_set_voltage_limit(chip->usb_psy, (vfloat_mv + 50) * 1000);
+	if (rc)
+		dev_err(chip->dev, "Couldn't publish the floating voltage "
+		        "to the usb power supply, rc %d\n", rc);
 
 	rc = smbchg_sec_masked_write(chip, chip->chgr_base + VFLOAT_CFG_REG,
 			VFLOAT_MASK, temp);
@@ -6648,6 +6656,22 @@ err:
 	return rc;
 }
 
+static void smbchg_set_vfloat_mv(struct smbchg_chip *chip)
+{
+	struct power_supply *parallel_psy = get_parallel_psy(chip);
+	union power_supply_propval pval = {0, };
+	int rc;
+
+	/* Instead of reading qcom,float-voltage-mv from the
+	 * smbcharger bindings, retrieve it from the bq25892-charger */
+	rc = parallel_psy->get_property(parallel_psy,
+			POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
+	if (rc)
+		chip->vfloat_mv = -EINVAL;
+	else
+		chip->vfloat_mv = pval.intval / 1000; /* uV to mV */
+}
+
 #define DEFAULT_VLED_MAX_UV		3500000
 #define DEFAULT_FCC_MA			2000
 static int smb_parse_dt(struct smbchg_chip *chip)
@@ -6671,7 +6695,6 @@ static int smb_parse_dt(struct smbchg_chip *chip)
 			"fastchg-current-ma", rc, 1);
 	if (chip->cfg_fastchg_current_ma == -EINVAL)
 		chip->cfg_fastchg_current_ma = DEFAULT_FCC_MA;
-	OF_PROP_READ(chip, chip->vfloat_mv, "float-voltage-mv", rc, 1);
 	OF_PROP_READ(chip, chip->safety_time, "charging-timeout-mins", rc, 1);
 	OF_PROP_READ(chip, chip->vled_max_uv, "vled-max-uv", rc, 1);
 	if (chip->vled_max_uv < 0)
@@ -6708,6 +6731,11 @@ static int smb_parse_dt(struct smbchg_chip *chip)
 	if (chip->parallel.min_current_thr_ma != -EINVAL
 			&& chip->parallel.min_9v_current_thr_ma != -EINVAL)
 		chip->parallel.avail = true;
+
+	/* get_parallel_psy is safe to be called after
+	 * chip->parallel.avail is set to true */
+	smbchg_set_vfloat_mv(chip);
+
 	/*
 	 * use the dt values if they exist, otherwise do not touch the params
 	 */
