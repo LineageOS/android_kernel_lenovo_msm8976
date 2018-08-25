@@ -368,11 +368,6 @@ enum wake_reason {
 	PM_TIMER_TEMP_CHECK=BIT(5)
 };
 
-enum wake_reason_to_parallel {
-	PM_TO_PARALLEL_PARALLEL_CHECK = BIT(0),
-	PM_TO_PARALLEL_TIMER_SOC=BIT(1)
-};
-
 enum fcc_voters {
 	ESR_PULSE_FCC_VOTER,
 	BATT_TYPE_FCC_VOTER,

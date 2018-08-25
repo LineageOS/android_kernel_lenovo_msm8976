@@ -8,6 +8,11 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/workqueue.h>
 
+enum wake_reason_to_parallel {
+	PM_TO_PARALLEL_PARALLEL_CHECK = BIT(0),
+	PM_TO_PARALLEL_TIMER_SOC=BIT(1)
+};
+
 enum {
 	USER	= BIT(0),
 	THERMAL = BIT(1),

@@ -746,30 +746,44 @@ done:
 	return rc;
 }
 
-static void bq25892_stay_awake(struct bq25892_charger *chip, int reason)
+static char *bq25892_wake_reason_to_string(enum wake_reason_to_parallel reason)
+{
+	switch (reason) {
+	case PM_TO_PARALLEL_PARALLEL_CHECK:
+		return "PM_TO_PARALLEL_PARALLEL_CHECK";
+	case PM_TO_PARALLEL_TIMER_SOC:
+		return "PM_TO_PARALLEL_TIMER_SOC";
+	default:
+		return "(unknown)";
+	}
+}
+
+static void bq25892_stay_awake(struct bq25892_charger *chip,
+                               enum wake_reason_to_parallel reason)
 {
 	int reasons;
 
 	mutex_lock(&chip->pm_lock);
 	reasons = chip->wake_reasons | reason;
 	if (reasons != 0 && chip->wake_reasons == 0) {
-		dev_info(chip->dev, "staying awake: 0x%02x (bit %d)\n",
-				reasons, reason);
+		dev_dbg(chip->dev, "staying awake: reason %s (mask 0x%02x)\n",
+		        bq25892_wake_reason_to_string(reason), reasons);
 		pm_stay_awake(chip->dev);
 	}
 	chip->wake_reasons = reasons;
 	mutex_unlock(&chip->pm_lock);
 }
 
-static void bq25892_relax(struct bq25892_charger *chip, int reason)
+static void bq25892_relax(struct bq25892_charger *chip,
+                          enum wake_reason_to_parallel reason)
 {
 	int reasons;
 
 	mutex_lock(&chip->pm_lock);
 	reasons = chip->wake_reasons & (~reason);
 	if (reasons == 0 && chip->wake_reasons != 0) {
-		dev_info(chip->dev, "relaxing: 0x%02x (bit %d)\n",
-				reasons, reason);
+		dev_dbg(chip->dev, "relaxing: reason %s (mask 0x%02x)\n",
+		        bq25892_wake_reason_to_string(reason), reasons);
 		pm_relax(chip->dev);
 	}
 	chip->wake_reasons = reasons;
