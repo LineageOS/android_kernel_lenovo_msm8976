@@ -476,7 +476,6 @@ module_param_named(
 	int, S_IRUSR | S_IWUSR
 );
 
-static struct power_supply *get_parallel_psy(struct smbchg_chip *chip);
 static void set_pmi_parallel_icl(struct smbchg_chip *chip, int pmi_ma, bool parallel_force_off);
 static void vbus_input_current_distribution_process(struct smbchg_chip *chip);
 #define HVDCP_NOTIFY_MS		1000
@@ -907,6 +906,13 @@ static void read_usb_type(struct smbchg_chip *chip, char **usb_type_name,
 	*usb_supply_type = get_usb_supply_type(type);
 }
 
+static inline struct power_supply *get_parallel_psy(struct smbchg_chip *chip)
+{
+	if (!chip->parallel.avail)
+		return NULL;
+	return chip->parallel.psy;
+}
+
 #define CHGR_STS			0x0E
 #define BATT_LESS_THAN_2V		BIT(4)
 #define CHG_HOLD_OFF_BIT		BIT(3)
@@ -920,10 +926,10 @@ static void read_usb_type(struct smbchg_chip *chip, char **usb_type_name,
 #define BAT_TCC_REACHED_BIT		BIT(7)
 static int get_prop_batt_status(struct smbchg_chip *chip)
 {
-	int rc, status = POWER_SUPPLY_STATUS_DISCHARGING;
 	struct power_supply *parallel_psy = get_parallel_psy(chip);
 	union power_supply_propval pval = {0, };
 	bool charger_present;
+	int rc;
 
 	charger_present = is_usb_present(chip);
 	if (!charger_present)
@@ -932,15 +938,12 @@ static int get_prop_batt_status(struct smbchg_chip *chip)
 	if (chip->b_TI_termed)
 		return POWER_SUPPLY_STATUS_FULL;
 
-	if (parallel_psy) {
-		rc = parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_STATUS, &pval);
-		if (rc)
-			return POWER_SUPPLY_STATUS_DISCHARGING;
+	rc = parallel_psy->get_property(parallel_psy,
+				POWER_SUPPLY_PROP_STATUS, &pval);
+	if (rc)
+		return POWER_SUPPLY_STATUS_DISCHARGING;
 
-		status = pval.intval;
-	}
-	return status;
+	return pval.intval;
 }
 
 #define BAT_PRES_STATUS			0x08
@@ -1423,18 +1426,6 @@ static int smbchg_set_dc_current_max(struct smbchg_chip *chip, int current_ma)
 				DCIN_INPUT_MASK, dc_cur_val);
 }
 
-static struct power_supply *get_parallel_psy(struct smbchg_chip *chip)
-{
-	if (!chip->parallel.avail)
-		return NULL;
-	if (chip->parallel.psy)
-		return chip->parallel.psy;
-	chip->parallel.psy = power_supply_get_by_name("usb-parallel");
-	if (!chip->parallel.psy)
-		dev_warn_ratelimited(chip->dev, "parallel charger not found\n");
-	return chip->parallel.psy;
-}
-
 static void smbchg_usb_update_online_work(struct work_struct *work)
 {
 	struct smbchg_chip *chip = container_of(work,
@@ -1771,12 +1762,13 @@ static int smbchg_set_fastchg_current_raw(struct smbchg_chip *chip,
 #define PARALLEL_CHG_THRESHOLD_CURRENT	1800
 static void smbchg_detect_parallel_charger(struct smbchg_chip *chip)
 {
-	struct power_supply *parallel_psy = get_parallel_psy(chip);
+	int rc;
 
-	if (parallel_psy)
-		chip->parallel_charger_detected =
-			power_supply_set_present(parallel_psy, true) ?
-								false : true;
+	rc = power_supply_set_present(get_parallel_psy(chip), true);
+	if (rc)
+		chip->parallel_charger_detected = false;
+	else
+		chip->parallel_charger_detected = true;
 }
 
 #define USB_AICL_CFG				0xF3
@@ -7375,11 +7367,17 @@ static int smbchg_probe(struct spmi_device *spmi)
 	int rc;
 	struct smbchg_chip *chip;
 	struct power_supply *usb_psy;
+	struct power_supply *parallel_psy;
 	struct qpnp_vadc_chip *vadc_dev, *vchg_vadc_dev;
 
 	usb_psy = power_supply_get_by_name("usb");
 	if (!usb_psy) {
-		dev_info(chip->dev, "USB supply not found, deferring probe\n");
+		dev_info(&spmi->dev, "USB supply not found, deferring probe\n");
+		return -EPROBE_DEFER;
+	}
+	parallel_psy = power_supply_get_by_name("usb-parallel");
+	if (!parallel_psy) {
+		dev_info(&spmi->dev, "BQ25892 parallel charger not found, deferring probe\n");
 		return -EPROBE_DEFER;
 	}
 
@@ -7491,6 +7489,7 @@ static int smbchg_probe(struct spmi_device *spmi)
 	chip->usb_psy = usb_psy;
 	chip->fake_battery_soc = -EINVAL;
 	chip->usb_online = -EINVAL;
+	chip->parallel.psy = parallel_psy;
 	dev_set_drvdata(&spmi->dev, chip);
 
 	spin_lock_init(&chip->sec_access_lock);
