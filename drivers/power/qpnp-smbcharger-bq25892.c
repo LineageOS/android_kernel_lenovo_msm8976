@@ -1771,19 +1771,6 @@ static void smbchg_detect_parallel_charger(struct smbchg_chip *chip)
 		chip->parallel_charger_detected = true;
 }
 
-#define USB_AICL_CFG				0xF3
-#define AICL_EN_BIT				BIT(2)
-static void smbchg_rerun_aicl(struct smbchg_chip *chip)
-{
-	dev_info(chip->dev, "Rerunning AICL...\n");
-	smbchg_sec_masked_write(chip, chip->usb_chgpth_base + USB_AICL_CFG,
-			AICL_EN_BIT, 0);
-	/* Add a delay so that AICL successfully clears */
-	msleep(50);
-	smbchg_sec_masked_write(chip, chip->usb_chgpth_base + USB_AICL_CFG,
-			AICL_EN_BIT, AICL_EN_BIT);
-}
-
 static void taper_irq_en(struct smbchg_chip *chip, bool en)
 {
 	mutex_lock(&chip->taper_irq_lock);
@@ -2802,6 +2789,8 @@ static bool smbchg_is_input_current_limited(struct smbchg_chip *chip)
 	return !!(reg & AICL_INPUT_STS_BIT);
 }
 
+#define USB_AICL_CFG			0xF3
+#define AICL_EN_BIT			BIT(2)
 #define DC_AICL_CFG			0xF3
 #define MISC_TRIM_OPT_15_8		0xF5
 #define USB_AICL_DEGLITCH_MASK		(BIT(5) | BIT(4) | BIT(3))
@@ -4400,31 +4389,6 @@ static void restore_from_hvdcp_detection(struct smbchg_chip *chip)
 		dev_err(chip->dev, "Couldn't retract HVDCP ICL vote rc=%d\n", rc);
 }
 
-#define RESTRICTED_CHG_FCC_PERCENT	50
-static int smbchg_restricted_charging(struct smbchg_chip *chip, bool enable)
-{
-	int current_table_index, fastchg_current;
-	int rc = 0;
-
-	/* If enable, set the fcc to the set point closest
-	 * to 50% of the configured fcc while remaining below it
-	 */
-	current_table_index = find_smaller_in_array(
-			chip->tables.usb_ilim_ma_table,
-			chip->cfg_fastchg_current_ma
-				* RESTRICTED_CHG_FCC_PERCENT / 100,
-			chip->tables.usb_ilim_ma_len);
-	fastchg_current =
-		chip->tables.usb_ilim_ma_table[current_table_index];
-	rc = vote(chip->fcc_votable, RESTRICTED_CHG_FCC_VOTER, enable,
-			fastchg_current);
-
-	dev_info(chip->dev, "restricted_charging set to %d\n", enable);
-	chip->restricted_charging = enable;
-
-	return rc;
-}
-
 static void handle_usb_removal(struct smbchg_chip *chip)
 {
 	struct power_supply *parallel_psy = get_parallel_psy(chip);
@@ -5330,7 +5294,6 @@ static int parallel_is_standard_adapter(struct smbchg_chip *chip)
 static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_PRESENT,
-	//POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_CAPACITY,
@@ -5352,10 +5315,7 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_DP_DM,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED,
 	POWER_SUPPLY_PROP_ALLOW_HVDCP3,
-	//POWER_SUPPLY_PROP_RERUN_AICL,
-	//POWER_SUPPLY_PROP_RESTRICTED_CHARGING,
 	POWER_SUPPLY_PROP_STANDARD_ADAPTER,
-
 };
 
 static int smbchg_battery_set_property(struct power_supply *psy,
@@ -5367,11 +5327,6 @@ static int smbchg_battery_set_property(struct power_supply *psy,
 				struct smbchg_chip, batt_psy);
 
 	switch (prop) {
-	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
-		dev_info(chip->dev, "POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED\n");
-		vote(chip->battchg_suspend_votable, BATTCHG_USER_EN_VOTER,
-				!val->intval, 0);
-		break;
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 		dev_info(chip->dev, "POWER_SUPPLY_PROP_CHARGING_ENABLED\n");
 		if (chip->chg_enabled != (!!val->intval)) {
@@ -5422,12 +5377,6 @@ static int smbchg_battery_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_DP_DM:
 		rc = smbchg_dp_dm(chip, val->intval);
 		break;
-	case POWER_SUPPLY_PROP_RERUN_AICL:
-		smbchg_rerun_aicl(chip);
-		break;
-	case POWER_SUPPLY_PROP_RESTRICTED_CHARGING:
-		rc = smbchg_restricted_charging(chip, val->intval);
-		break;
 	case POWER_SUPPLY_PROP_ALLOW_HVDCP3:
 		if (chip->allow_hvdcp3_detection != val->intval) {
 			chip->allow_hvdcp3_detection = !!val->intval;
@@ -5447,7 +5396,6 @@ static int smbchg_battery_is_writeable(struct power_supply *psy,
 	int rc;
 
 	switch (prop) {
-	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_CAPACITY:
 	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
@@ -5455,8 +5403,6 @@ static int smbchg_battery_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 	case POWER_SUPPLY_PROP_SAFETY_TIMER_ENABLE:
 	case POWER_SUPPLY_PROP_DP_DM:
-	case POWER_SUPPLY_PROP_RERUN_AICL:
-	case POWER_SUPPLY_PROP_RESTRICTED_CHARGING:
 	case POWER_SUPPLY_PROP_ALLOW_HVDCP3:
 		rc = 1;
 		break;
@@ -5488,14 +5434,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 			chip->batt_present = rval;
 		} else
 			val->intval = get_prop_batt_present(chip);
-		break;
-	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
-		if (parallel_psy) {
-			parallel_psy->get_property(parallel_psy,
-				POWER_SUPPLY_PROP_PRESENT, &pval);
-			val->intval = pval.intval;
-		} else val->intval =
-			!get_effective_result(chip->battchg_suspend_votable);
 		break;
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 		val->intval = chip->chg_enabled;
@@ -5576,9 +5514,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 			val->intval = pval.intval;
 		} else
 			val->intval = smbchg_is_input_current_limited(chip);
-		break;
-	case POWER_SUPPLY_PROP_RERUN_AICL:
-		val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_NOW:
 		if (parallel_psy) {
