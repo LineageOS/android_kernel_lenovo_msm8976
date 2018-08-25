@@ -1116,11 +1116,6 @@ static int bq25892_parse_dt(struct bq25892_charger *chip)
 	chip->force_hvdcp_2p0 = of_property_read_bool(node,
 		"qcom,force-hvdcp-2p0");
 
-	rc = of_property_read_string(node, "qcom,bms-psy-name",
-	                             &chip->bms_psy_name);
-	if (rc)
-		chip->bms_psy_name = NULL;
-
 	rc = of_property_read_u32(node, "qcom,fastchg-current-max-ma",
 	                          &chip->fastchg_current_max_ma);
 	if (rc)
@@ -1361,7 +1356,12 @@ static int bq25892_parallel_charger_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, chip);
 
-	chip->parallel_psy.name		= "usb-parallel";
+	rc = of_property_read_string(chip->dev->of_node,
+	                             "qcom,parallel-psy-name",
+	                             &chip->parallel_psy.name);
+	if (rc)
+		chip->parallel_psy.name = "usb-parallel";
+
 	chip->parallel_psy.type		= POWER_SUPPLY_TYPE_USB_PARALLEL;
 	chip->parallel_psy.get_property	= bq25892_parallel_get_property;
 	chip->parallel_psy.set_property	= bq25892_parallel_set_property;
@@ -1414,7 +1414,6 @@ static int bq25892_charger_remove(struct i2c_client *client)
 	gpio_set_value(chip->psel_gpio, 1);
 	gpio_free(chip->psel_gpio);
 	cancel_delayed_work_sync(&chip->chg_remove_work);
-	power_supply_unregister(&chip->batt_psy);
 
 	mutex_destroy(&chip->irq_complete);
 	debugfs_remove_recursive(chip->debug_root);
