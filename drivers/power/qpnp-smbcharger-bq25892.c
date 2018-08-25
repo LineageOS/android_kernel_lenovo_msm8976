@@ -2548,79 +2548,6 @@ out:
 static int smbchg_ibat_ocp_threshold_ua = 4500000;
 module_param(smbchg_ibat_ocp_threshold_ua, int, 0644);
 
-#define UCONV			1000000LL
-#define MCONV			1000LL
-#define FLASH_V_THRESHOLD	3000000
-#define FLASH_VDIP_MARGIN	100000
-#define VPH_FLASH_VDIP		(FLASH_V_THRESHOLD + FLASH_VDIP_MARGIN)
-#define BUCK_EFFICIENCY		800LL
-static int smbchg_calc_max_flash_current(struct smbchg_chip *chip)
-{
-	int ocv_uv, esr_uohm, rbatt_uohm, ibat_now, rc;
-	int64_t ibat_flash_ua, avail_flash_ua, avail_flash_power_fw;
-	int64_t ibat_safe_ua, vin_flash_uv, vph_flash_uv;
-
-	rc = get_property_from_fg(chip, POWER_SUPPLY_PROP_VOLTAGE_OCV, &ocv_uv);
-	if (rc) {
-		dev_info(chip->dev, "bms psy does not support OCV\n");
-		return 0;
-	}
-
-	rc = get_property_from_fg(chip, POWER_SUPPLY_PROP_RESISTANCE,
-			&esr_uohm);
-	if (rc) {
-		dev_info(chip->dev, "bms psy does not support resistance\n");
-		return 0;
-	}
-
-	rc = msm_bcl_read(BCL_PARAM_CURRENT, &ibat_now);
-	if (rc) {
-		dev_info(chip->dev, "BCL current read failed: %d\n", rc);
-		return 0;
-	}
-
-	rbatt_uohm = esr_uohm + chip->rpara_uohm + chip->rslow_uohm;
-	/*
-	 * Calculate the maximum current that can pulled out of the battery
-	 * before the battery voltage dips below a safe threshold.
-	 */
-	ibat_safe_ua = div_s64((ocv_uv - VPH_FLASH_VDIP) * UCONV,
-				rbatt_uohm);
-
-	if (ibat_safe_ua <= smbchg_ibat_ocp_threshold_ua) {
-		/*
-		 * If the calculated current is below the OCP threshold, then
-		 * use it as the possible flash current.
-		 */
-		ibat_flash_ua = ibat_safe_ua - ibat_now;
-		vph_flash_uv = VPH_FLASH_VDIP;
-	} else {
-		/*
-		 * If the calculated current is above the OCP threshold, then
-		 * use the ocp threshold instead.
-		 *
-		 * Any higher current will be tripping the battery OCP.
-		 */
-		ibat_flash_ua = smbchg_ibat_ocp_threshold_ua - ibat_now;
-		vph_flash_uv = ocv_uv - div64_s64((int64_t)rbatt_uohm
-				* smbchg_ibat_ocp_threshold_ua, UCONV);
-	}
-	/* Calculate the input voltage of the flash module. */
-	vin_flash_uv = max((chip->vled_max_uv + 500000LL),
-				div64_s64((vph_flash_uv * 1200), 1000));
-	/* Calculate the available power for the flash module. */
-	avail_flash_power_fw = BUCK_EFFICIENCY * vph_flash_uv * ibat_flash_ua;
-	/*
-	 * Calculate the available amount of current the flash module can draw
-	 * before collapsing the battery. (available power/ flash input voltage)
-	 */
-	avail_flash_ua = div64_s64(avail_flash_power_fw, vin_flash_uv * MCONV);
-	dev_info(chip->dev,
-		"avail_iflash=%lld, ocv=%d, ibat=%d, rbatt=%d\n",
-		avail_flash_ua, ocv_uv, ibat_now, rbatt_uohm);
-	return (int)avail_flash_ua;
-}
-
 #define FCC_CMP_CFG	0xF3
 #define FCC_COMP_MASK	SMB_MASK(1, 0)
 static int smbchg_fastchg_current_comp_set(struct smbchg_chip *chip,
@@ -5410,7 +5337,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
-	POWER_SUPPLY_PROP_FLASH_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
@@ -5594,9 +5520,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
-		break;
-	case POWER_SUPPLY_PROP_FLASH_CURRENT_MAX:
-		val->intval = smbchg_calc_max_flash_current(chip);
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		if (parallel_psy) {
