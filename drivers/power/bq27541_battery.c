@@ -595,7 +595,11 @@ static void bq27541_external_power_changed(struct power_supply *psy)
 static int bq27541_power_supply_init(struct bq27541_device_info *di)
 {
 	int ret;
-	di->bat.name = "bms";
+
+	ret = of_property_read_string(di->dev->of_node, "qcom,bms-psy-name",
+	                              &di->bat.name);
+	if (ret)
+		di->bat.name = "bms";
 	di->bat.type = POWER_SUPPLY_TYPE_BMS;
 	di->bat.properties = bq27541_battery_props;
 	di->bat.num_properties = ARRAY_SIZE(bq27541_battery_props);
