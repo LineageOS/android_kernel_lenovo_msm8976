@@ -1343,7 +1343,6 @@ static int bq25892_parallel_charger_probe(struct i2c_client *client,
 
 	chip->client = client;
 	chip->dev = &client->dev;
-	chip->parallel_charger = true;
 
 	async_work_init(chip);
 	/* probe the device to check if its actually connected */
@@ -1422,65 +1421,6 @@ static int bq25892_charger_remove(struct i2c_client *client)
 	return 0;
 }
 
-static int bq25892_suspend(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct bq25892_charger *chip = i2c_get_clientdata(client);
-	/* no suspend resume activities for parallel charger */
-
-	if (chip->parallel_charger)
-		return 0;
-	mutex_lock(&chip->irq_complete);
-	chip->resume_completed = false;
-	mutex_unlock(&chip->irq_complete);
-
-	return 0;
-}
-
-static int bq25892_suspend_noirq(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct bq25892_charger *chip = i2c_get_clientdata(client);
-
-	/* no suspend resume activities for parallel charger */
-	if (chip->parallel_charger)
-		return 0;
-
-	if (chip->irq_waiting) {
-		dev_err_ratelimited(chip->dev,
-			"Aborting suspend, an interrupt was detected while suspending\n");
-		return -EBUSY;
-	}
-	return 0;
-}
-
-static int bq25892_resume(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct bq25892_charger *chip = i2c_get_clientdata(client);
-
-	/* no suspend resume activities for parallel charger */
-	if (chip->parallel_charger)
-		return 0;
-
-	mutex_lock(&chip->irq_complete);
-	chip->resume_completed = true;
-	if (chip->irq_waiting) {
-		mutex_unlock(&chip->irq_complete);
-		bq25892_chg_stat_handler(client->irq, chip);
-		enable_irq(client->irq);
-	} else {
-		mutex_unlock(&chip->irq_complete);
-	}
-	return 0;
-}
-
-static const struct dev_pm_ops bq25892_pm_ops = {
-	.suspend	= bq25892_suspend,
-	.suspend_noirq	= bq25892_suspend_noirq,
-	.resume		= bq25892_resume,
-};
-
 static struct of_device_id bq25892_match_table[] = {
 	{ .compatible = "qcom,bq25892-charger",},
 	{ },
@@ -1497,7 +1437,6 @@ static struct i2c_driver bq25892_charger_driver = {
 		.name		= "bq25892-charger",
 		.owner		= THIS_MODULE,
 		.of_match_table	= bq25892_match_table,
-		.pm		= &bq25892_pm_ops,
 	},
 	.probe		= bq25892_parallel_charger_probe,
 	.remove		= bq25892_charger_remove,
