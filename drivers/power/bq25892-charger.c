@@ -934,7 +934,7 @@ static int bq25892_parallel_get_property(struct power_supply *psy,
 			val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		val->intval = chip->vfloat_mv;
+		val->intval = chip->vfloat_mv * 1000; /* mV to uV */
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = chip->parallel_charger_present;
