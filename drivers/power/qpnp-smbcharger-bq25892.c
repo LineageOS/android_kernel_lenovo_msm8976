@@ -476,7 +476,6 @@ module_param_named(
 	int, S_IRUSR | S_IWUSR
 );
 
-static void dump_regs(struct smbchg_chip *chip);
 static struct power_supply *get_parallel_psy(struct smbchg_chip *chip);
 static void set_pmi_parallel_icl(struct smbchg_chip *chip, int pmi_ma, bool parallel_force_off);
 static void vbus_input_current_distribution_process(struct smbchg_chip *chip);
@@ -1008,6 +1007,7 @@ static int set_property_on_fg(struct smbchg_chip *chip,
 	return rc;
 }
 
+/* Queries the fuel gauge/battery monitor driver (BQ27541) */
 static int get_property_from_fg(struct smbchg_chip *chip,
 		enum power_supply_property prop, int *val)
 {
@@ -4302,142 +4302,9 @@ static void temp_process(struct smbchg_chip *chip, bool usb_present)
 	}
 }
 
-static void print_debug_info(struct smbchg_chip *chip)
-{
-	union power_supply_propval pval = {0, };
-	struct power_supply *parallel_psy = get_parallel_psy(chip);
-	int rc;
-	u8 reg;
-	static const char* s_power_status[] = {
-		[POWER_SUPPLY_STATUS_UNKNOWN] = "Unknown",
-		[POWER_SUPPLY_STATUS_CHARGING] = "Charging",
-		[POWER_SUPPLY_STATUS_DISCHARGING] = "Discharging",
-		[POWER_SUPPLY_STATUS_NOT_CHARGING] = "Not charging",
-		[POWER_SUPPLY_STATUS_FULL] = "Full"
-	};
-
-	static const char* s_icl_mode_str[] = {
-		"High Current",
-		"100mA",
-		"500mA",
-		"Reserved"
-	};
-
-	static const char* s_pwr_path_str[] = {
-		"Not Used",
-		"Powered from Battery",
-		"Powered from USB charger",
-		"Powered from DC charger"
-	};
-
-	static const char* s_pmi_chgr_sts_str[] = {
-		"No charging",
-		"Pre-charging",
-		"Fast-charging",
-		"Taper charging"
-	};
-
-	dev_info(chip->dev, "b_chg_standard = %d, b_chg_checked = %d\n",
-				chip->b_chg_standard,
-				chip->b_chg_checked);
-	dev_info(chip->dev, "b_TI_termed= %d\n",
-				chip->b_TI_termed);
-	dev_info(chip->dev, "b_capacity_high= %d\n",
-				chip->b_capacity_high);
-	dev_info(chip->dev, "b_chg_paused= %d\n",
-				chip->b_chg_paused);
-	dev_info(chip->dev, "usb_max_current_ma= %d, usb_total_max_current_ma = %d\n",
-				chip->usb_max_current_ma,
-				chip->usb_total_max_current_ma);
-	if (parallel_psy) {
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_STATUS, &pval);
-		dev_info(chip->dev, "Ti supply status= %s\n",
-					s_power_status[pval.intval]);
-
-		get_property_from_fg(chip, POWER_SUPPLY_PROP_CAPACITY, &pval.intval);
-		dev_info(chip->dev, "soc= %d\n", pval.intval);
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_VBUS_NOW, &pval);
-		dev_info(chip->dev, "vbus= %d\n", pval.intval);
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_INPUT_CURRENT_NOW, &pval);
-		dev_info(chip->dev, "vbus input current= %d\n", pval.intval / 1000);
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
-		dev_info(chip->dev, "current charge current= %d\n", pval.intval);
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX, &pval);
-		dev_info(chip->dev, "ffc max = %d\n", pval.intval / 1000);
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
-		dev_info(chip->dev, "vfloat_mv = %d\n", pval.intval );
-
-		parallel_psy->get_property(parallel_psy,
-					POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
-		dev_info(chip->dev, "vbattery_mv = %d\n", pval.intval / 1000);
-	}
-
-	rc = smbchg_read(chip, &reg,
-			chip->usb_chgpth_base + CMD_IL, 1);
-	if (rc == 0) {
-		if (reg & BIT(0)) {
-			dev_info(chip->dev, "USBIN Mode Charge: HC Mode Current Level\n");
-		} else {
-			dev_info(chip->dev, "USBIN Mode Charge: USB5/1 or USB9/1.5 Current Levelsl\n");
-		}
-		if (reg & BIT(2)) {
-			dev_info(chip->dev, "ICL Override: Override APSD with Command Register\n");
-		} else {
-			dev_info(chip->dev, "ICL Override: Use ICL from APSD\n");
-		}
-		if (reg & BIT(4)) {
-			dev_info(chip->dev, "USBIN Suspend: suspend\n");
-		} else {
-			dev_info(chip->dev, "USBIN Suspend: normal\n");
-		}
-	} else {
-		dev_info(chip->dev, "Read CMD_IL_REG 0x%xFailed\n", chip->usb_chgpth_base + CMD_IL);
-	}
-
-	rc = smbchg_read(chip, &reg,
-			chip->usb_chgpth_base + ICL_STS_1_REG, 1);
-	if (rc == 0) {
-		dev_info(chip->dev, "aicl suspended = %d, ILIM = %d\n", !!(reg & AICL_SUSP_BIT) , chip->tables.usb_ilim_ma_table[reg & ICL_STS_MASK]);
-	} else {
-		dev_info(chip->dev, "Read ICL_STS_1_REG 0x%xFailed\n", chip->usb_chgpth_base + ICL_STS_1_REG);
-	}
-
-	rc = smbchg_read(chip, &reg,
-			chip->usb_chgpth_base + ICL_STS_2_REG, 1);
-	if (rc == 0) {
-		dev_info(chip->dev, "ICL Mode = %s\n", s_icl_mode_str[(reg >> 4) & 0x3]);
-		dev_info(chip->dev, "USBIN_SUSPEND_STS = %d, USBIN_ACTIVE_PWR_SRC = %d\n", !!(reg & BIT(3)), !!(reg & BIT(1)));
-	} else {
-		dev_info(chip->dev, "Read ICL_STS_2_REG 0x%xFailed\n", chip->usb_chgpth_base + ICL_STS_2_REG);
-	}
-
-	rc = smbchg_read(chip, &reg, chip->usb_chgpth_base + IDEV_STS, 1);
-	if (rc == 0) {
-		dev_info(chip->dev, "power path sts = %s\n", s_pwr_path_str[reg & 0x3]);
-	} else {
-		dev_info(chip->dev, "Read IDEV_STS REG 0x%xFailed\n", chip->usb_chgpth_base + IDEV_STS);
-	}
-
-	rc = smbchg_read(chip, &reg, chip->chgr_base + 0x0E, 1);
-	if (rc == 0) {
-		dev_info(chip->dev, "CHARGING_STS = %s\n", s_pmi_chgr_sts_str[(reg >> 1) & 0x3]);
-		dev_info(chip->dev, "CHG_EN= %d\n", (reg & 0x1));
-	} else {
-		dev_info(chip->dev, "Read CHARGING_STS REG 0x%xFailed\n", chip->chgr_base + 0x0E);
-	}
-}
-
+/* Workqueue for retrieving the State of Charge (percent)
+ * from the Fuel Gauge driver (BQ27541).
+ */
 static void smbchg_get_fg_soc_work(struct work_struct *work)
 {
 	struct smbchg_chip *chip = container_of(work,
@@ -4486,17 +4353,18 @@ static void smbchg_get_fg_soc_work(struct work_struct *work)
 			chip->cur_mtkhand_up_cnt = 0;
 			chip->cur_mtkhand_down_cnt = 0;
 		}
-		print_debug_info(chip);
 		kt = ns_to_ktime(chip->soc_interval);
 	} else {
 		temp_process(chip, usb_present);
 		dev_info(chip->dev, "usb not present!\n");
-		print_debug_info(chip);
-		if (soc <= 1) {
+		/* Running low on battery? Don't make it worse by
+		 * consuming extra energy with polling.
+		 */
+		if (soc <= 1)
 			set_soc_interval_min(chip, GET_SOC_NOTIFY_MS_1MIN);
-		} else if (soc <= 3) {
+		else if (soc <= 3)
 			set_soc_interval_min(chip, GET_SOC_NOTIFY_MS_5MINS);
-		}
+
 		kt = ns_to_ktime(chip->soc_interval);
 	}
 	reget_soc:
@@ -7396,47 +7264,6 @@ static int smbchg_parse_peripherals(struct smbchg_chip *chip)
 	return rc;
 }
 
-static inline void dump_reg(struct smbchg_chip *chip, u16 addr,
-		const char *name)
-{
-	u8 reg;
-
-	smbchg_read(chip, &reg, addr, 1);
-	dev_dbg(chip->dev, "%s - %04X = %02X\n", name, addr, reg);
-}
-
-/* dumps useful registers for debug */
-static void dump_regs(struct smbchg_chip *chip)
-{
-	u16 addr;
-
-	/* charger peripheral */
-	for (addr = 0xB; addr <= 0x10; addr++)
-		dump_reg(chip, chip->chgr_base + addr, "CHGR Status");
-	for (addr = 0xF0; addr <= 0xFF; addr++)
-		dump_reg(chip, chip->chgr_base + addr, "CHGR Config");
-	/* battery interface peripheral */
-	dump_reg(chip, chip->bat_if_base + RT_STS, "BAT_IF Status");
-	dump_reg(chip, chip->bat_if_base + CMD_CHG_REG, "BAT_IF Command");
-	for (addr = 0xF0; addr <= 0xFB; addr++)
-		dump_reg(chip, chip->bat_if_base + addr, "BAT_IF Config");
-	/* usb charge path peripheral */
-	for (addr = 0x7; addr <= 0x10; addr++)
-		dump_reg(chip, chip->usb_chgpth_base + addr, "USB Status");
-	dump_reg(chip, chip->usb_chgpth_base + CMD_IL, "USB Command");
-	for (addr = 0xF0; addr <= 0xF5; addr++)
-		dump_reg(chip, chip->usb_chgpth_base + addr, "USB Config");
-	/* dc charge path peripheral */
-	dump_reg(chip, chip->dc_chgpth_base + RT_STS, "DC Status");
-	for (addr = 0xF0; addr <= 0xF6; addr++)
-		dump_reg(chip, chip->dc_chgpth_base + addr, "DC Config");
-	/* misc peripheral */
-	dump_reg(chip, chip->misc_base + IDEV_STS, "MISC Status");
-	dump_reg(chip, chip->misc_base + RT_STS, "MISC Status");
-	for (addr = 0xF0; addr <= 0xF3; addr++)
-		dump_reg(chip, chip->misc_base + addr, "MISC CFG");
-}
-
 static int create_debugfs_entries(struct smbchg_chip *chip)
 {
 	struct dentry *ent;
@@ -7791,7 +7618,6 @@ static int smbchg_probe(struct spmi_device *spmi)
 		power_supply_set_present(chip->usb_psy, chip->usb_present);
 	}
 
-	dump_regs(chip);
 	create_debugfs_entries(chip);
 	dev_info(chip->dev,
 		"SMBCHG successfully probe Charger version=%s Revision DIG:%d.%d ANA:%d.%d batt=%d dc=%d usb=%d\n",
