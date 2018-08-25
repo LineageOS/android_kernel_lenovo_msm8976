@@ -41,7 +41,6 @@ struct bq25892_charger {
 	bool			using_pmic_therm;
 	bool			jeita_supported;
 	bool			battery_missing;
-	const char		*bms_psy_name;
 	bool			resume_completed;
 	bool			irq_waiting;
 	struct delayed_work	chg_remove_work;
@@ -67,10 +66,7 @@ struct bq25892_charger {
 	bool			force_hvdcp_2p0;
 
 	/* psy */
-	struct power_supply	*usb_psy;
 	int			usb_psy_ma;
-	struct power_supply	*bms_psy;
-	struct power_supply	batt_psy;
 	struct power_supply	parallel_psy;
 
 	struct bq25892_regulator	otg_vreg;

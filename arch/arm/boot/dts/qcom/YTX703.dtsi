@@ -184,6 +184,7 @@
 		compatible = "qcom,bq25892-charger";
 		reg = <0x6b>;
 		qcom,parallel-charger;
+		qcom,parallel-psy-name = "usb-parallel";
 		qcom,float-voltage-mv = <4352>;
 		qcom,recharge-mv = <200>;
 		qcom,fastchg-current-max-ma = <3800>;
@@ -196,6 +197,7 @@
 	};
 	bq27541-battery@55 {
 		compatible = "qcom,bq27541-battery";
+		qcom,bms-psy-name = "bms";
 		qcom,max-design-voltage-mv = <4350>;
 		reg = <0x55>;
 	};
@@ -319,12 +321,15 @@
  * Charger
  * Overrides msm-pmi8950.dtsi
  */
-&pmi8950_charger {
-	qcom,battery-psy-name= "battery";
+&pmi8950_charger { /* qcom,qpnp-smbcharger */
+	qcom,battery-psy-name   = "battery";      /* smbcharger driver will register this */
+	qcom,parallel-psy-name  = "usb-parallel"; /* BQ25892 */
+	qcom,bms-psy-name       = "bms";          /* BQ27541 fuel gauge meter */
+	qcom,usb-psy-name       = "usb";          /* phy-msm-usb */
 	qcom,fastchg-current-ma = <3000>;
 	qcom,iterm-disabled;
 	/delete-property/ qcom,iterm-ma;
-	/delete-property/ qcom,float-voltage-mv;
+	/delete-property/ qcom,float-voltage-mv;  /* Moved to BQ25892 */
 	/delete-property/ qcom,resume-delta-mv;
 	/delete-property/ qcom,autoadjust-vfloat;
 	/delete-property/ qcom,force-aicl-rerun;
