@@ -59,7 +59,6 @@ struct bq25892_charger {
 	int			workaround_flags;
 
 	int			parallel_pin_polarity_setting;
-	bool			parallel_charger;
 	bool			parallel_charger_present;
 	bool			bms_controlled_charging;
 	bool			apsd_rerun;
