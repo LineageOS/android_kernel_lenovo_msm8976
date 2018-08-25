@@ -176,50 +176,11 @@ static enum power_supply_property bq27541_battery_props[] = {
 	POWER_SUPPLY_PROP_POWER_AVG,
 	POWER_SUPPLY_PROP_HEALTH,
 };
-#ifndef ODMM_CHARGING_TEST
-#define ODMM_CHARGING_TEST
-
-static bool enable_charging = true;
-static bool enable_test = false;
-#endif
-//#define TEMP_REGION_DEBUG
-#ifdef TEMP_REGION_DEBUG
-static int smbchg_temp_debug= 250;
-
-module_param_named(
-	temp_debug, smbchg_temp_debug, int, S_IRUSR | S_IWUSR
-);
-
-static int smbchg_temp_debug_interval = 20;
-static int cur_count = 0;
-
-module_param_named(
-	temp_debug_interval, smbchg_temp_debug_interval, int, S_IRUSR | S_IWUSR
-);
-
-static int smbchg_temp_debug_auto = 0;
-
-module_param_named(
-	temp_debug_auto, smbchg_temp_debug_auto, int, S_IRUSR | S_IWUSR
-);
-
-static int smbchg_temp_debug_auto_up = 1;
-
-module_param_named(
-	temp_debug_auto_up, smbchg_temp_debug_auto_up, int, S_IRUSR | S_IWUSR
-);
-#endif
-
 
 static unsigned int poll_interval = 1;
 module_param(poll_interval, uint, 0644);
 MODULE_PARM_DESC(poll_interval, "battery poll interval in seconds - " \
 				"0 disables polling");
-
-#ifndef  ODMM_CHARGING_STATUS
-bool bq24196_is_charging();
-#endif
-
 
 /*
  * Common code for BQ27541 devices
@@ -230,25 +191,6 @@ static inline int bq27541_read(struct bq27541_device_info *di, u8 reg,
 {
 	return di->bus.read(di, reg, single);
 }
-
-#if 0
-static int bq27541_write(struct bq27541_device_info *di, u8 reg,
-			     void *val, bool single)
-{
-	return di->bus.write(di, reg, val, single);
-}
-#endif
-
-#ifdef ODMM_CHARGING_TEST
-int bq27541_config_charging_status(bool start_test,bool start_charging)
-{
-	enable_test = start_test;
-	if(start_test)
-		enable_charging = start_charging;
-	return 0;
-}
-EXPORT_SYMBOL(bq27541_config_charging_status);
-#endif
 
 /*
  * StateOfCharge( )
@@ -471,28 +413,6 @@ static void bq27541_update(struct bq27541_device_info *di)
 		no_cmp_cache.batt_vol= bq27541_battery_voltage(di);
 		no_cmp_cache.current_now = bq27541_average_current(di);
 		no_cmp_cache.nac = bq27541_battery_read_nac(di);
-#ifdef TEMP_REGION_DEBUG
-		if (smbchg_temp_debug_auto) {
-			cur_count += poll_interval;
-			if (cur_count >= smbchg_temp_debug_interval) {
-				cur_count = 0;
-				if (smbchg_temp_debug_auto_up)
-					smbchg_temp_debug += 10;
-				else
-					smbchg_temp_debug -= 10;
-
-				if (smbchg_temp_debug < -100) {
-					smbchg_temp_debug = -100;
-					smbchg_temp_debug_auto_up = 1;
-				} else if (smbchg_temp_debug > 600){
-					smbchg_temp_debug = 600;
-					if (smbchg_temp_debug_auto > 1)
-						smbchg_temp_debug_auto_up = 0;
-				}
-			}
-		}
-		cache.temperature = smbchg_temp_debug;
-#endif
 	}
 
 	if (memcmp(&di->cache, &cache, sizeof(cache)) != 0) {
