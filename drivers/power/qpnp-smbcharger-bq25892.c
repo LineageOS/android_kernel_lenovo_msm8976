@@ -4040,7 +4040,7 @@ static void vbus_input_current_distribution_process(struct smbchg_chip *chip)
 		cur_current_ma = pval.intval;
 		parallel_psy->get_property(parallel_psy,
 					POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
-		cur_vol_mv = pval.intval;
+		cur_vol_mv = pval.intval / 1000; /* uV to mV */
 
 		dev_info(chip->dev, "cur_vbus_mv = %d, cur_current_ma = %d, cur_vol_mv = %d\n", cur_vbus_mv, cur_current_ma, cur_vol_mv);
 		cur_ilimit_cal = (cur_current_ma * cur_vol_mv ) / 10;
@@ -4380,7 +4380,7 @@ static void print_debug_info(struct smbchg_chip *chip)
 
 		parallel_psy->get_property(parallel_psy,
 					POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
-		dev_info(chip->dev, "vbattery_mv = %d\n", pval.intval );
+		dev_info(chip->dev, "vbattery_mv = %d\n", pval.intval / 1000);
 	}
 
 	rc = smbchg_read(chip, &reg,

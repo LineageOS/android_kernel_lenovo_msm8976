@@ -865,39 +865,14 @@ static int bq25892_parallel_is_writeable(struct power_supply *psy,
 	}
 }
 
-static int bq25892_parallel_batt_voltage_now(struct bq25892_charger *chip)
+static int bq25892_parallel_batt_voltage_now_mv(struct bq25892_charger *chip)
 {
-	int val1 = 0;
-	u8 reg1;
-	int val2 = 0;
-	u8 reg2;
+	u8  reg;
 
 	bq25892_adcc_work(chip, 0 /* force */);
-	bq25892_read_reg(chip, CHG_REG_0E, &reg1);
+	bq25892_read_reg(chip, CHG_REG_0E, &reg);
 
-	val1 = (reg1 & 0x7F) * 20 + 2304;
-	dev_info(chip->dev, "batt_voltage_now: raw %x, value %d\n",
-	         reg1, val1);
-
-	bq25892_read_reg(chip, CHG_REG_12, &reg2);
-	val2 = (reg2 & 0x7F) * 50;
-	dev_dbg(chip->dev, "charging_current_now: raw %x, value %d\n",
-	        reg2, val2);
-	bq25892_read_reg(chip, CHG_REG_11, &reg2);
-	val2 = (reg2 & 0x7F ) * 100 + 2600;
-	dev_dbg(chip->dev, "parallel_batt_vbus: status %d, value %d\n",
-	        !!(reg2 & 0x80) , val2);
-	bq25892_read_reg(chip, CHG_REG_13, &reg2);
-	val2 = (reg2 & 0x3F ) * 50 + 100;
-	dev_dbg(chip->dev, "parallel_batt_VINDPM: VINDPM status %d, IINDPM status %d, val = %d\n",
-	        !!(reg2 & 0x80) , !!(reg2 & 0x40), val2);
-	bq25892_read_reg(chip, CHG_REG_0D, &reg2);
-	val2 = (reg2 & 0x7F ) * 100 + 2600;
-	dev_dbg(chip->dev, "CHG_REG_0D: FORCE_VINDPM %d, VINDPM %d\n",
-	        !!(reg2 & 0x80) , val2);
-
-	/* Return cached batt_voltage_now value */
-	return val1;
+	return (reg & 0x7F) * 20 + 2304;
 }
 
 static int bq25892_parallel_input_current_base_ico(struct bq25892_charger *chip)
@@ -987,7 +962,8 @@ static int bq25892_parallel_get_property(struct power_supply *psy,
 			val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = bq25892_parallel_batt_voltage_now(chip);
+		val->intval  = bq25892_parallel_batt_voltage_now_mv(chip);
+		val->intval *= 1000; /* mV to uV */
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		val->intval = bq25892_get_prop_charge_type(chip);
