@@ -5612,7 +5612,7 @@ static irqreturn_t batt_hot_handler(int irq, void *_chip)
 	smbchg_read(chip, &reg, chip->bat_if_base + RT_STS, 1);
 	dev_info(chip->dev, "%s triggered: RT_STS 0x%02x\n",
 	         __func__, reg);
-	//chip->batt_hot = !!(reg & HOT_BAT_HARD_BIT);
+	chip->batt_hot = !!(reg & HOT_BAT_HARD_BIT);
 	return IRQ_HANDLED;
 }
 
@@ -5624,7 +5624,7 @@ static irqreturn_t batt_cold_handler(int irq, void *_chip)
 	smbchg_read(chip, &reg, chip->bat_if_base + RT_STS, 1);
 	dev_info(chip->dev, "%s triggered: RT_STS 0x%02x\n",
 	         __func__, reg);
-	//chip->batt_cold = !!(reg & COLD_BAT_HARD_BIT);
+	chip->batt_cold = !!(reg & COLD_BAT_HARD_BIT);
 	return IRQ_HANDLED;
 }
 
@@ -5636,7 +5636,7 @@ static irqreturn_t batt_warm_handler(int irq, void *_chip)
 	smbchg_read(chip, &reg, chip->bat_if_base + RT_STS, 1);
 	dev_info(chip->dev, "%s triggered: RT_STS 0x%02x\n",
 	         __func__, reg);
-	//chip->batt_warm = !!(reg & HOT_BAT_SOFT_BIT);
+	chip->batt_warm = !!(reg & HOT_BAT_SOFT_BIT);
 	return IRQ_HANDLED;
 }
 
@@ -5648,7 +5648,7 @@ static irqreturn_t batt_cool_handler(int irq, void *_chip)
 	smbchg_read(chip, &reg, chip->bat_if_base + RT_STS, 1);
 	dev_info(chip->dev, "%s triggered: RT_STS 0x%02x\n",
 	         __func__, reg);
-	//chip->batt_cool = !!(reg & COLD_BAT_SOFT_BIT);
+	chip->batt_cool = !!(reg & COLD_BAT_SOFT_BIT);
 	return IRQ_HANDLED;
 }
 
