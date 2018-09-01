@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a154b9c_82e1319f",
+        "filename": "arch/arm/boot/dts/qcom/YTX703.dtsi",
+        "patchSetId": 1
+      },
+      "lineNbr": 150,
+      "author": {
+        "id": 18924
+      },
+      "writtenOn": "2018-09-01T21:39:25Z",
+      "side": 1,
+      "message": "0x80 would probably be less confusing",
+      "revId": "b61a94de901699692131414e5843c4350982ea46",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
