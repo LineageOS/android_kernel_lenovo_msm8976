@@ -195,7 +195,8 @@ static int mdss_livedisplay_update_locked(struct mdss_dsi_ctrl_pdata *ctrl_pdata
 	}
 
 	// Restore saved RGB settings
-	mdss_livedisplay_set_rgb_locked(mlc->mfd);
+	if (mlc->r != 32768 || mlc->g != 32768 || mlc->b != 32768)
+		mdss_livedisplay_set_rgb_locked(mlc->mfd);
 
 	if (!mlc->caps){
 		return 0;
