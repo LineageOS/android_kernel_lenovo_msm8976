@@ -286,9 +286,6 @@ static int mdss_livedisplay_update_locked(struct mdss_dsi_ctrl_pdata *ctrl_pdata
 
 	kfree(cmd_buf);
 
-	// Restore saved RGB settings
-	mdss_livedisplay_set_rgb_locked(mlc->mfd);
-
 	return ret;
 }
 
