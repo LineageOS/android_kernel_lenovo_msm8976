@@ -463,12 +463,15 @@ static ssize_t mdss_livedisplay_set_preset(struct device *dev,
 	mutex_lock(&mlc->lock);
 
 	sscanf(buf, "%du", &value);
-	if (value < 0 || value >= mlc->num_presets)
-		return -EINVAL;
+	if (value < 0 || value >= mlc->num_presets){
+		count = -EINVAL;
+		break err;
+	}
 
 	mlc->preset = value;
 	mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_PRESET);
 
+err:
 	mutex_unlock(&mlc->lock);
 
 	return count;
