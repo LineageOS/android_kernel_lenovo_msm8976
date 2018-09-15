@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d0ce7af6_5de9da68",
+        "filename": "drivers/video/msm/mdss/mdss_livedisplay.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 468,
+      "author": {
+        "id": 18924
+      },
+      "writtenOn": "2018-09-15T19:19:59Z",
+      "side": 1,
+      "message": "2 issues here.\nFirst, labeled break is a java-ism, there\u0027s no such thing in C. do a \"goto out\" statement, it\u0027s very popular in the kernel.\nSecondly, the return value is ssize_t (signed) while the count variable is size_t (unsigned). I\u0027m afraid it might be problematic to assign a signed value (-EINVAL) to an unsigned variable. I would create a ssize_t rc, which I\u0027d set to -EINVAL in this if() block, and to \"count\" right before the \"out\" label.\nAlso very minor: coding style would require a space here \"){\".",
+      "revId": "ec0e226f06bb4ffd3fc9c54569902e262189206c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
