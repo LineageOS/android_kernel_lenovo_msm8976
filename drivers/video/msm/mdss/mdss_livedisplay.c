@@ -459,19 +459,23 @@ static ssize_t mdss_livedisplay_set_preset(struct device *dev,
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+	ssize_t rc = count;
 
 	mutex_lock(&mlc->lock);
 
 	sscanf(buf, "%du", &value);
-	if (value < 0 || value >= mlc->num_presets)
-		return -EINVAL;
+	if (value < 0 || value >= mlc->num_presets) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	mlc->preset = value;
 	mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_PRESET);
 
+out:
 	mutex_unlock(&mlc->lock);
 
-	return count;
+	return rc;
 }
 
 static ssize_t mdss_livedisplay_get_num_presets(struct device *dev,
