@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016,2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1837,7 +1837,7 @@ static int gpu_ft_report_pos;
 #define pr_fault(_d, _c, fmt, args...) \
 		dev_err((_d)->dev, "%s[%d]: " fmt, \
 		_kgsl_context_comm((_c)->context), \
-		(_c)->context->proc_priv->pid, ##args); \
+		pid_nr((_c)->context->proc_priv->pid), ##args); \
 		pr_gpu_ft_report(fmt, ##args)
 
 
@@ -2292,7 +2292,7 @@ static int dispatcher_do_fault(struct kgsl_device *device)
 		gpu_ft_report_pos = 0;
 		pr_gpu_ft_report("GPU FT: fault = %d\n%s[%d]\n", fault,
 			_kgsl_context_comm(cmdbatch->context),
-			cmdbatch->context->proc_priv->pid);
+			pid_nr(cmdbatch->context->proc_priv->pid));
 
 		adreno_fault_header(hung_rb, cmdbatch);
 		kgsl_device_snapshot(device, cmdbatch->context);
