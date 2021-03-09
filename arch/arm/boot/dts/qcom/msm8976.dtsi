@@ -407,6 +407,7 @@
 
 	cci_cache: qcom,cci {
 		compatible = "devfreq-simple-dev";
+		plain-dev-name;
 		clock-names = "devfreq_clk";
 		clocks = <&clock_cpu clk_cci_clk>;
 		governor = "cpufreq";
@@ -420,6 +421,7 @@
 
 	cpubw: qcom,cpubw {
 		compatible = "qcom,devbw";
+		plain-dev-name;
 		governor = "cpufreq";
 		qcom,src-dst-ports = <1 512>;
 		qcom,active-only;
@@ -437,6 +439,7 @@
 
 	mincpubw: qcom,mincpubw {
 		compatible = "qcom,devbw";
+		plain-dev-name;
 		governor = "cpufreq";
 		qcom,src-dst-ports = <1 512>;
 		qcom,active-only;
@@ -876,6 +879,7 @@
 
 	qcom,bcl {
 		compatible = "qcom,bcl";
+		plain-dev-name;
 		qcom,bcl-enable;
 		qcom,bcl-framework-interface;
 		qcom,bcl-freq-control-list = <&CPU4 &CPU5 &CPU6 &CPU7>;

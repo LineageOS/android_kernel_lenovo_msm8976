@@ -14,11 +14,13 @@
 	msm_bus: qcom,kgsl-busmon{
 		label = "kgsl-busmon";
 		compatible = "qcom,kgsl-busmon";
+		plain-dev-name;
 	};
 
 	/* Bus governor */
 	gpubw: qcom,gpubw {
 		compatible = "qcom,devbw";
+		plain-dev-name;
 		governor = "bw_vbif";
 		qcom,src-dst-ports = <26 512>;
 		qcom,bw-tbl =

@@ -74,9 +74,12 @@ EXPORT_SYMBOL(of_find_device_by_node);
  */
 void of_device_make_bus_id(struct device *dev)
 {
+	static atomic_t bus_no_reg_magic;
 	struct device_node *node = dev->of_node;
 	const __be32 *reg;
 	u64 addr;
+	const __be32 *addrp;
+	int magic;
 
 #ifdef CONFIG_PPC_DCR
 	/*
@@ -98,25 +101,56 @@ void of_device_make_bus_id(struct device *dev)
 	}
 #endif /* CONFIG_PPC_DCR */
 
-	/* Construct the name, using parent nodes if necessary to ensure uniqueness */
-	while (node->parent) {
-		/*
-		 * If the address can be translated, then that is as much
-		 * uniqueness as we need. Make it the first component and return
-		 */
-		reg = of_get_property(node, "reg", NULL);
-		if (reg && (addr = of_translate_address(node, reg)) != OF_BAD_ADDR) {
-			dev_set_name(dev, dev_name(dev) ? "%llx.%s:%s" : "%llx.%s",
-				     (unsigned long long)addr, node->name,
-				     dev_name(dev));
-			return;
-		}
+	if ( of_property_read_bool( node, "plain-dev-name") ) {
+		/* Construct the name, using parent nodes if necessary to ensure uniqueness */
+		while (node->parent) {
+			/*
+			 * If the address can be translated, then that is as much
+			 * uniqueness as we need. Make it the first component and return
+			 */
+			reg = of_get_property(node, "reg", NULL);
+			if (reg && (addr = of_translate_address(node, reg)) != OF_BAD_ADDR) {
+				dev_set_name(dev, dev_name(dev) ? "%llx.%s:%s" : "%llx.%s",
+					     (unsigned long long)addr, node->name,
+					     dev_name(dev));
+				return;
+			}
 
-		/* format arguments only used if dev_name() resolves to NULL */
-		dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
-			     strrchr(node->full_name, '/') + 1, dev_name(dev));
-		node = node->parent;
+			/* format arguments only used if dev_name() resolves to NULL */
+			dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
+				     strrchr(node->full_name, '/') + 1, dev_name(dev));
+			node = node->parent;
+		}
+		return;
 	}
+
+	/*
+	 * For MMIO, get the physical address
+	 */
+	reg = of_get_property(node, "reg", NULL);
+	if (reg) {
+		if (of_can_translate_address(node)) {
+		    addr = of_translate_address(node, reg);
+		} else {
+		    addrp = of_get_address(node, 0, NULL, NULL);
+		    if (addrp)
+			addr = of_read_number(addrp, 1);
+		    else
+			addr = OF_BAD_ADDR;
+		}
+		if (addr != OF_BAD_ADDR) {
+		    dev_set_name(dev, "%llx.%s",
+			     (unsigned long long)addr, node->name);
+		    return;
+		}
+	}
+
+	/*
+	 * No BusID, use the node name and add a globally incremented
+	 * counter (and pray...)
+	 */
+	magic = atomic_add_return(1, &bus_no_reg_magic);
+	dev_set_name(dev, "%s.%d", node->name, magic - 1);
 }
 
 /**

@@ -1119,6 +1119,7 @@
 
 	devfreq_spdm_cpu {
 		compatible = "qcom,devfreq_spdm";
+		plain-dev-name;
 		qcom,msm-bus,name = "devfreq_spdm";
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
